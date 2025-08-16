@@ -67,7 +67,7 @@
         <!-- User/Admin Toggle -->
         <div class="flex justify-end mb-6 space-x-2">
              <div class="relative w-full md:w-auto">
-                <input type="text" id="current-user-input" placeholder="Enter your name to filter.." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-shadow">
+                <input type="text" id="current-user-input" placeholder="Enter your name to filter..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-shadow">
             </div>
             <button id="admin-login-btn" class="bg-orange-500 text-white font-medium py-2 px-4 rounded-lg hover:bg-orange-600 transition-colors duration-200 shadow-md">Admin Login</button>
         </div>
@@ -144,12 +144,15 @@
                  <button id="download-btn" class="bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors duration-200 shadow-md">
                      Download Report
                  </button>
+                 <button id="remove-all-completed-btn" class="bg-red-500 text-white font-medium py-2 px-4 rounded-lg hover:bg-red-600 transition-colors duration-200 shadow-md">
+                    Remove All Completed
+                </button>
              </div>
         </div>
     </div>
     
     <!-- Modal for Admin Login -->
-    <div id="admin-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center">
+    <div id="admin-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center z-50">
         <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
             <h3 class="text-xl font-semibold mb-4">Admin Login</h3>
             <p class="text-sm text-gray-600 mb-4">This is a client-side demo. Use password "admin" to log in.</p>
@@ -161,6 +164,17 @@
         </div>
     </div>
 
+    <!-- Confirmation Modal for Deletion -->
+    <div id="confirm-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
+            <h3 class="text-xl font-semibold mb-4">Confirm Deletion</h3>
+            <p id="confirm-message" class="text-sm text-gray-600 mb-4">Are you sure you want to delete this task?</p>
+            <div class="flex justify-end space-x-2">
+                <button id="cancel-delete-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg">Cancel</button>
+                <button id="confirm-delete-btn" class="px-4 py-2 bg-red-600 text-white rounded-lg">Delete</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         const taskForm = document.getElementById('task-form');
@@ -185,11 +199,18 @@
         const currentUserInput = document.getElementById('current-user-input');
         const returnTasksBtn = document.getElementById('return-tasks-btn');
         const sortBySelect = document.getElementById('sort-by');
+        const removeAllCompletedBtn = document.getElementById('remove-all-completed-btn');
+        const confirmModal = document.getElementById('confirm-modal');
+        const confirmMessage = document.getElementById('confirm-message');
+        const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+        
         const priorityMap = { 'High': 3, 'Medium': 2, 'Low': 1 };
 
         let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
         let editingIndex = -1; // -1 means no task is being edited
         let isAdmin = false;
+        let deleteAction = null; // Stores the function to execute on confirmation
 
         const disableEditFields = (disabled) => {
             taskNameInput.disabled = disabled;
@@ -336,17 +357,18 @@
         const addEventListeners = () => {
              // Remove existing listeners to prevent duplicates
             document.querySelectorAll('.edit-btn').forEach(btn => btn.removeEventListener('click', handleAdminEdit));
-            document.querySelectorAll('.delete-btn').forEach(btn => btn.removeEventListener('click', handleDelete));
+            document.querySelectorAll('.delete-btn').forEach(btn => btn.removeEventListener('click', showConfirmModal));
             document.querySelectorAll('.complete-btn').forEach(btn => btn.removeEventListener('click', handleComplete));
             document.querySelectorAll('.edit-btn-user').forEach(btn => btn.removeEventListener('click', handleUserEdit));
             document.querySelectorAll('.save-btn').forEach(btn => btn.removeEventListener('click', handleUserSave));
+            removeAllCompletedBtn.removeEventListener('click', showConfirmModal);
 
             // Admin event listeners
             document.querySelectorAll('.edit-btn').forEach(button => {
                 button.addEventListener('click', handleAdminEdit);
             });
             document.querySelectorAll('.delete-btn').forEach(button => {
-                button.addEventListener('click', handleDelete);
+                button.addEventListener('click', showConfirmModal);
             });
             
             // User event listeners
@@ -359,6 +381,7 @@
             document.querySelectorAll('.save-btn').forEach(button => {
                 button.addEventListener('click', handleUserSave);
             });
+            removeAllCompletedBtn.addEventListener('click', showConfirmModal);
         };
 
         const handleAdminEdit = (e) => {
@@ -416,18 +439,34 @@
             editFormContainer.classList.add('hidden');
         };
 
-        const handleDelete = (e) => {
-             const index = e.currentTarget.dataset.index;
+        const showConfirmModal = (e) => {
+            const isRemoveAll = e.currentTarget.id === 'remove-all-completed-btn';
+            
+            if (isRemoveAll) {
+                const allCompleted = tasks.every(task => task.status === 'Completed');
+                if (!allCompleted) {
+                    alert('All tasks must be completed before you can clear them all.');
+                    return;
+                }
+                confirmMessage.textContent = 'Are you sure you want to remove all completed tasks?';
+                deleteAction = removeAllCompleted;
+            } else {
+                const index = e.currentTarget.dataset.index;
+                confirmMessage.textContent = `Are you sure you want to delete the task: "${tasks[index].name}"?`;
+                deleteAction = () => deleteSingleTask(index);
+            }
+            confirmModal.classList.remove('hidden');
+        };
+        
+        const deleteSingleTask = (index) => {
              tasks.splice(index, 1);
              saveTasks();
              renderTasks();
              renderAnalytics();
         };
-        
-        const handleComplete = (e) => {
-            const index = e.currentTarget.dataset.index;
-            tasks[index].status = 'Completed';
-            tasks[index].completionDate = new Date().toISOString();
+
+        const removeAllCompleted = () => {
+            tasks = [];
             saveTasks();
             renderTasks();
             renderAnalytics();
@@ -584,11 +623,24 @@
             userViewContainer.classList.remove('hidden');
             renderTasks(); // Re-render tasks to show user buttons
         });
+        
+        // Modal button listeners
+        cancelDeleteBtn.addEventListener('click', () => {
+            confirmModal.classList.add('hidden');
+            deleteAction = null;
+        });
+
+        confirmDeleteBtn.addEventListener('click', () => {
+            if (deleteAction) {
+                deleteAction();
+            }
+            confirmModal.classList.add('hidden');
+        });
 
         downloadBtn.addEventListener('click', downloadReport);
         currentUserInput.addEventListener('input', renderTasks);
         sortBySelect.addEventListener('change', renderTasks);
-
+        
         // Initial render on page load
         document.addEventListener('DOMContentLoaded', () => {
             renderTasks();
