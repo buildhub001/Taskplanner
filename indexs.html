@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Planner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #1f2937;
+            /* Orange textured background */
+            background: #FFB347;
+            background: -webkit-linear-gradient(to top, #FFB347, #ff6347);
+            background: linear-gradient(to top, #FFB347, #ff6347);
+            background-size: 100% 100%;
+            background-attachment: fixed;
+        }
+
+        .textured-card {
+            background-color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(10px);
+        }
+        
+        .btn-primary {
+            background-color: #f97316;
+            transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 150ms;
+        }
+
+        .btn-primary:hover {
+            background-color: #ea580c;
+        }
+
+        .status-button-icon {
+            transform: rotate(-90deg);
+        }
+        .text-orange-600 {
+            color: #ea580c;
+        }
+        .border-orange-200 {
+            border-color: #fce7d8;
+        }
+        .bg-orange-50 {
+            background-color: #fff7ed;
+        }
+        
+        .unique-user-panel {
+            background-color: #fff;
+            border: 2px solid #ea580c;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 2.5rem;
+            margin-bottom: 2.5rem;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto textured-card rounded-xl shadow-lg p-6 md:p-10">
+        <h1 class="text-3xl md:text-4xl font-bold text-center mb-8 text-orange-600 drop-shadow-md">Team Task Planner</h1>
+
+        <!-- User/Admin Toggle -->
+        <div class="flex justify-end mb-6 space-x-2">
+             <div class="relative w-full md:w-auto">
+                <input type="text" id="current-user-input" placeholder="Enter your name to filter..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-shadow">
+            </div>
+            <button id="admin-login-btn" class="bg-orange-500 text-white font-medium py-2 px-4 rounded-lg hover:bg-orange-600 transition-colors duration-200 shadow-md">Admin Login</button>
+        </div>
+
+        <!-- User View Section -->
+        <div id="user-view-container" class="unique-user-panel">
+             <div class="flex items-center justify-between mb-4">
+                <h2 class="text-2xl font-semibold text-gray-800">My Tasks</h2>
+                 <select id="sort-by" class="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-shadow">
+                    <option value="dueDate">Sort by Due Date</option>
+                    <option value="priority">Sort by Priority</option>
+                </select>
+            </div>
+            <div id="task-list" class="space-y-4">
+                <p id="no-tasks-message" class="text-center text-gray-500 italic">No tasks yet. Add one above!</p>
+            </div>
+        </div>
+
+        <hr class="my-10 border-gray-300">
+
+        <!-- Admin Dashboard Section -->
+        <div id="admin-view-container" class="hidden">
+            <!-- Add a New Task form is now in the admin view -->
+            <h2 class="text-2xl font-semibold mb-4 text-gray-800">Add a New Task</h2>
+            <form id="task-form" class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8 items-end">
+                <div class="md:col-span-2">
+                    <label for="task-name" class="block text-sm font-medium text-gray-700 mb-1">Task Name</label>
+                    <input type="text" id="task-name" placeholder="Enter task name..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-shadow" required>
+                </div>
+                <div>
+                    <label for="assigned-to" class="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
+                    <input type="text" id="assigned-to" placeholder="Team member's name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-shadow">
+                </div>
+                <div>
+                    <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select id="status" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-shadow">
+                        <option value="Not Started" selected>Not Started</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Completed">Completed</option>
+                    </select>
+                </div>
+                <div class="lg:col-span-1">
+                    <label for="priority" class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                    <select id="priority" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-shadow">
+                        <option value="High">High</option>
+                        <option value="Medium" selected>Medium</option>
+                        <option value="Low">Low</option>
+                    </select>
+                </div>
+                <div class="md:col-span-4 lg:col-span-2">
+                    <label for="due-date" class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                    <input type="date" id="due-date" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-shadow" required>
+                </div>
+                <div class="md:col-span-4 lg:col-span-3">
+                    <label for="comments" class="block text-sm font-medium text-gray-700 mb-1">Comments</label>
+                    <textarea id="comments" rows="2" placeholder="Add comments..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-shadow"></textarea>
+                </div>
+                <div class="md:col-span-4 lg:col-span-1">
+                    <button type="submit" id="submit-btn" class="w-full btn-primary text-white font-medium py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors duration-200 shadow-md">
+                        Add Task
+                    </button>
+                    <input type="hidden" id="task-index">
+                </div>
+            </form>
+
+             <h2 class="text-2xl font-semibold mb-4 text-gray-800">Analytics Dashboard</h2>
+             <div id="employee-status-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <!-- Employee status cards will be dynamically inserted here -->
+             </div>
+             <div class="flex justify-end mt-6 space-x-2">
+                 <button id="return-tasks-btn" class="bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors duration-200 shadow-md">
+                     Return to My Tasks
+                 </button>
+                 <button id="download-btn" class="bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors duration-200 shadow-md">
+                     Download Report
+                 </button>
+             </div>
+        </div>
+    </div>
+    
+    <!-- Modal for Admin Login -->
+    <div id="admin-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
+            <h3 class="text-xl font-semibold mb-4">Admin Login</h3>
+            <p class="text-sm text-gray-600 mb-4">This is a client-side demo. Use password "admin" to log in.</p>
+            <input type="password" id="admin-password-input" placeholder="Enter admin password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-shadow mb-4">
+            <div class="flex justify-end space-x-2">
+                <button id="close-modal-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg">Cancel</button>
+                <button id="login-modal-btn" class="px-4 py-2 bg-orange-600 text-white rounded-lg btn-primary">Login</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        const taskForm = document.getElementById('task-form');
+        const taskNameInput = document.getElementById('task-name');
+        const assignedToInput = document.getElementById('assigned-to');
+        const statusSelect = document.getElementById('status');
+        const prioritySelect = document.getElementById('priority');
+        const dueDateInput = document.getElementById('due-date');
+        const commentsInput = document.getElementById('comments');
+        const submitBtn = document.getElementById('submit-btn');
+        const taskList = document.getElementById('task-list');
+        const noTasksMessage = document.getElementById('no-tasks-message');
+        const employeeStatusContainer = document.getElementById('employee-status-container');
+        const downloadBtn = document.getElementById('download-btn');
+        const adminLoginBtn = document.getElementById('admin-login-btn');
+        const adminModal = document.getElementById('admin-modal');
+        const adminPasswordInput = document.getElementById('admin-password-input');
+        const loginModalBtn = document.getElementById('login-modal-btn');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const adminViewContainer = document.getElementById('admin-view-container');
+        const userViewContainer = document.getElementById('user-view-container');
+        const currentUserInput = document.getElementById('current-user-input');
+        const returnTasksBtn = document.getElementById('return-tasks-btn');
+        const sortBySelect = document.getElementById('sort-by');
+        const priorityMap = { 'High': 3, 'Medium': 2, 'Low': 1 };
+
+        let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+        let editingIndex = -1; // -1 means no task is being edited
+        let isAdmin = false;
+
+        const disableEditFields = (disabled) => {
+            taskNameInput.disabled = disabled;
+            assignedToInput.disabled = disabled;
+            prioritySelect.disabled = disabled;
+            dueDateInput.disabled = disabled;
+        };
+
+        // Function to render tasks to the DOM
+        const renderTasks = () => {
+            taskList.innerHTML = '';
+            const filterName = currentUserInput.value.trim().toLowerCase();
+            const filteredTasks = tasks.filter(task => {
+                if (!filterName) return true; // Show all if no filter is set
+                const assignedTo = (task.assignedTo || 'Unassigned').toLowerCase();
+                return assignedTo.includes(filterName);
+            });
+            
+            // Apply sorting
+            const sortOrder = sortBySelect.value;
+            if (sortOrder === 'dueDate') {
+                 filteredTasks.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+            } else if (sortOrder === 'priority') {
+                filteredTasks.sort((a, b) => priorityMap[b.priority] - priorityMap[a.priority]);
+            }
+
+            if (filteredTasks.length === 0) {
+                noTasksMessage.style.display = 'block';
+            } else {
+                noTasksMessage.style.display = 'none';
+            }
+
+            filteredTasks.forEach((task, index) => {
+                const originalIndex = tasks.findIndex(t => t === task); // Find the original index for editing
+                const taskItem = document.createElement('div');
+                taskItem.className = 'flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-lg shadow-sm transition-all duration-300 transform hover:scale-101 border';
+
+                let priorityColorClass;
+                switch (task.priority) {
+                    case 'High':
+                        priorityColorClass = 'bg-red-50 border-red-200';
+                        break;
+                    case 'Medium':
+                        priorityColorClass = 'bg-yellow-50 border-yellow-200';
+                        break;
+                    case 'Low':
+                        priorityColorClass = 'bg-green-50 border-green-200';
+                        break;
+                }
+
+                if (task.status === 'Completed') {
+                    taskItem.className += ' bg-gray-100 opacity-60 line-through border-gray-200';
+                } else {
+                    taskItem.className += ` ${priorityColorClass}`;
+                }
+
+                const today = new Date();
+                const due = new Date(task.dueDate);
+                const daysRemaining = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+                let dateDisplay;
+                let dateColorClass = 'text-gray-600';
+
+                if (task.status === 'Completed') {
+                    dateDisplay = `Completed on ${task.completionDate ? new Date(task.completionDate).toLocaleDateString() : 'N/A'}`;
+                } else if (daysRemaining < 0) {
+                    dateDisplay = `Overdue by ${Math.abs(daysRemaining)} days`;
+                    dateColorClass = 'text-red-600 font-semibold';
+                    taskItem.className = taskItem.className.replace(priorityColorClass, 'bg-red-100 border-red-300');
+                } else if (daysRemaining === 0) {
+                    dateDisplay = 'Due Today';
+                    dateColorClass = 'text-orange-500 font-semibold';
+                } else {
+                    dateDisplay = `Due in ${daysRemaining} days`;
+                }
+
+                let buttonsHtml = '';
+                if (isAdmin) {
+                    // Admin view buttons with full control
+                    buttonsHtml = `
+                         <button class="edit-btn bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 transition-colors" data-index="${originalIndex}" aria-label="Edit task">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-7.586 7.586A.5.5 0 0110.5 14H1.5a.5.5 0 010-1h9.086l7.586-7.586z" />
+                            </svg>
+                        </button>
+                        <button class="delete-btn bg-red-500 text-white p-2 rounded-md hover:bg-red-600 transition-colors" data-index="${originalIndex}" aria-label="Delete task">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    `;
+                } else {
+                    // User view buttons with limited functionality
+                    buttonsHtml = `
+                         <button class="complete-btn bg-green-500 text-white p-2 rounded-md hover:bg-green-600 transition-colors" data-index="${originalIndex}" aria-label="Mark as completed" ${task.status === 'Completed' ? 'disabled' : ''}>
+                           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                               <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                           </svg>
+                        </button>
+                        <button class="edit-btn-user bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 transition-colors" data-index="${originalIndex}" aria-label="Edit comments and status">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-7.586 7.586A.5.5 0 0110.5 14H1.5a.5.5 0 010-1h9.086l7.586-7.586z" />
+                            </svg>
+                        </button>
+                    `;
+                }
+
+                taskItem.innerHTML = `
+                    <div class="flex-1 min-w-0 mb-2 sm:mb-0">
+                        <div class="text-lg font-semibold text-gray-800">${task.name}</div>
+                        <div class="text-sm text-gray-500">
+                            <span>Assigned to: <span class="font-medium">${task.assignedTo || 'Unassigned'}</span></span>
+                            <span class="mx-2">•</span>
+                            <span>Status: <span class="font-medium">${task.status}</span></span>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1">Priority: <span class="capitalize">${task.priority}</span></div>
+                        <div class="text-xs ${dateColorClass} mt-1">${dateDisplay}</div>
+                        ${task.comments ? `<div class="text-xs text-gray-500 mt-2 italic">Comments: ${task.comments}</div>` : ''}
+                        <div class="edit-form-container mt-2 hidden">
+                            <div class="space-y-2 mt-2">
+                                <div class="flex items-center space-x-2">
+                                    <label for="edit-status-${originalIndex}" class="text-sm">Status:</label>
+                                    <select id="edit-status-${originalIndex}" class="px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-shadow">
+                                        <option value="Not Started">Not Started</option>
+                                        <option value="In Progress">In Progress</option>
+                                        <option value="Completed">Completed</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <textarea id="edit-comments-${originalIndex}" rows="1" placeholder="Update comments..." class="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-shadow"></textarea>
+                                </div>
+                                <button class="save-btn w-full btn-primary text-white font-medium py-1 px-2 rounded-lg text-sm transition-colors duration-200" data-index="${originalIndex}">Save</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex space-x-2 mt-4 sm:mt-0">
+                       ${buttonsHtml}
+                    </div>
+                `;
+                taskList.appendChild(taskItem);
+            });
+            addEventListeners();
+        };
+
+        const addEventListeners = () => {
+             // Remove existing listeners to prevent duplicates
+            document.querySelectorAll('.edit-btn').forEach(btn => btn.removeEventListener('click', handleAdminEdit));
+            document.querySelectorAll('.delete-btn').forEach(btn => btn.removeEventListener('click', handleDelete));
+            document.querySelectorAll('.complete-btn').forEach(btn => btn.removeEventListener('click', handleComplete));
+            document.querySelectorAll('.edit-btn-user').forEach(btn => btn.removeEventListener('click', handleUserEdit));
+            document.querySelectorAll('.save-btn').forEach(btn => btn.removeEventListener('click', handleUserSave));
+
+            // Admin event listeners
+            document.querySelectorAll('.edit-btn').forEach(button => {
+                button.addEventListener('click', handleAdminEdit);
+            });
+            document.querySelectorAll('.delete-btn').forEach(button => {
+                button.addEventListener('click', handleDelete);
+            });
+            
+            // User event listeners
+            document.querySelectorAll('.complete-btn').forEach(button => {
+                button.addEventListener('click', handleComplete);
+            });
+             document.querySelectorAll('.edit-btn-user').forEach(button => {
+                button.addEventListener('click', handleUserEdit);
+            });
+            document.querySelectorAll('.save-btn').forEach(button => {
+                button.addEventListener('click', handleUserSave);
+            });
+        };
+
+        const handleAdminEdit = (e) => {
+            const index = e.currentTarget.dataset.index;
+            const task = tasks[index];
+            
+            taskNameInput.value = task.name;
+            assignedToInput.value = task.assignedTo;
+            statusSelect.value = task.status;
+            prioritySelect.value = task.priority;
+            dueDateInput.value = task.dueDate;
+            commentsInput.value = task.comments;
+            
+            disableEditFields(false);
+            
+            editingIndex = index;
+            submitBtn.textContent = 'Update Task';
+            
+            // Scroll to the form
+            taskForm.scrollIntoView({ behavior: 'smooth' });
+        };
+        
+        const handleUserEdit = (e) => {
+            const index = e.currentTarget.dataset.index;
+            const task = tasks[index];
+            const taskItem = e.currentTarget.closest('.border');
+            const editFormContainer = taskItem.querySelector('.edit-form-container');
+            const editStatusSelect = taskItem.querySelector(`#edit-status-${index}`);
+            const editCommentsTextarea = taskItem.querySelector(`#edit-comments-${index}`);
+            
+            // Populate and show the inline form
+            editStatusSelect.value = task.status;
+            editCommentsTextarea.value = task.comments;
+            editFormContainer.classList.toggle('hidden');
+        };
+        
+        const handleUserSave = (e) => {
+            const index = e.currentTarget.dataset.index;
+            const taskItem = e.currentTarget.closest('.border');
+            const editFormContainer = taskItem.querySelector('.edit-form-container');
+            const editStatusSelect = taskItem.querySelector(`#edit-status-${index}`);
+            const editCommentsTextarea = taskItem.querySelector(`#edit-comments-${index}`);
+            
+            // Update the task with new values
+            tasks[index].status = editStatusSelect.value;
+            tasks[index].comments = editCommentsTextarea.value.trim();
+            if (tasks[index].status === 'Completed') {
+                tasks[index].completionDate = new Date().toISOString();
+            }
+            
+            saveTasks();
+            renderTasks();
+            renderAnalytics();
+            
+            editFormContainer.classList.add('hidden');
+        };
+
+        const handleDelete = (e) => {
+             const index = e.currentTarget.dataset.index;
+             tasks.splice(index, 1);
+             saveTasks();
+             renderTasks();
+             renderAnalytics();
+        };
+        
+        const handleComplete = (e) => {
+            const index = e.currentTarget.dataset.index;
+            tasks[index].status = 'Completed';
+            tasks[index].completionDate = new Date().toISOString();
+            saveTasks();
+            renderTasks();
+            renderAnalytics();
+        };
+
+        // Function to render the analytics dashboard
+        const renderAnalytics = () => {
+            employeeStatusContainer.innerHTML = '';
+            const statusCounts = {};
+
+            tasks.forEach(task => {
+                const assignedTo = task.assignedTo || 'Unassigned';
+                if (!statusCounts[assignedTo]) {
+                    statusCounts[assignedTo] = { 'Not Started': 0, 'In Progress': 0, 'Completed': 0, total: 0 };
+                }
+                statusCounts[assignedTo][task.status]++;
+                statusCounts[assignedTo].total++;
+            });
+
+            for (const assignedTo in statusCounts) {
+                const data = statusCounts[assignedTo];
+                const card = document.createElement('div');
+                card.className = 'bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-200';
+                card.innerHTML = `
+                    <h3 class="text-xl font-semibold mb-2 text-orange-600">${assignedTo}</h3>
+                    <div class="text-sm space-y-1 text-gray-700">
+                        <p>Total Tasks: <span class="font-bold">${data.total}</span></p>
+                        <p>Not Started: <span class="font-bold text-gray-500">${data['Not Started']}</span></p>
+                        <p>In Progress: <span class="font-bold text-yellow-500">${data['In Progress']}</span></p>
+                        <p>Completed: <span class="font-bold text-green-500">${data.Completed}</span></p>
+                    </div>
+                `;
+                employeeStatusContainer.appendChild(card);
+            }
+        };
+
+        // Function to handle data download as an Excel file with charts
+        const downloadReport = () => {
+            const taskDataForExcel = tasks.map(task => ({
+                'Task Name': task.name,
+                'Assigned To': task.assignedTo || 'Unassigned',
+                'Status': task.status,
+                'Priority': task.priority,
+                'Due Date': task.dueDate,
+                'Completion Date': task.completionDate ? new Date(task.completionDate).toLocaleDateString() : 'N/A',
+                'Comments': task.comments
+            }));
+
+            const taskSheet = XLSX.utils.json_to_sheet(taskDataForExcel);
+
+            const statusCounts = {};
+            tasks.forEach(task => {
+                const assignedTo = task.assignedTo || 'Unassigned';
+                if (!statusCounts[assignedTo]) {
+                    statusCounts[assignedTo] = { 'Not Started': 0, 'In Progress': 0, 'Completed': 0, 'Total': 0 };
+                }
+                statusCounts[assignedTo][task.status]++;
+                statusCounts[assignedTo]['Total']++;
+            });
+
+            const analyticsDataForExcel = Object.keys(statusCounts).map(assignedTo => ({
+                'Team Member': assignedTo,
+                ...statusCounts[assignedTo]
+            }));
+
+            const analyticsSheet = XLSX.utils.json_to_sheet(analyticsDataForExcel);
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, taskSheet, 'Task Report');
+            XLSX.utils.book_append_sheet(wb, analyticsSheet, 'Analytics Dashboard');
+
+            XLSX.writeFile(wb, "task_report.xlsx");
+        };
+
+        const saveTasks = () => {
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+        };
+
+        // Add task functionality
+        taskForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const taskName = taskNameInput.value.trim();
+            const assignedTo = assignedToInput.value.trim();
+            const status = statusSelect.value;
+            const priority = prioritySelect.value;
+            const dueDate = dueDateInput.value;
+            const comments = commentsInput.value.trim();
+
+            if (taskName && dueDate) {
+                if (editingIndex !== -1) {
+                    // Admin can update all fields
+                    tasks[editingIndex] = {
+                        name: taskName,
+                        assignedTo: assignedTo,
+                        status: status,
+                        priority: priority,
+                        dueDate: dueDate,
+                        comments: comments,
+                        completionDate: tasks[editingIndex].completionDate
+                    };
+                    editingIndex = -1;
+                    submitBtn.textContent = 'Update Task';
+                } else {
+                    // Admin adds new task
+                    const newTask = {
+                        name: taskName,
+                        assignedTo: assignedTo,
+                        status: status,
+                        priority: priority,
+                        dueDate: dueDate,
+                        comments: comments,
+                        completionDate: null
+                    };
+                    tasks.push(newTask);
+                }
+
+                saveTasks();
+                renderTasks();
+                renderAnalytics();
+
+                // Clear form inputs
+                taskForm.reset();
+            }
+        });
+
+        // Admin Login Logic
+        adminLoginBtn.addEventListener('click', () => {
+            adminModal.classList.remove('hidden');
+        });
+
+        loginModalBtn.addEventListener('click', () => {
+            if (adminPasswordInput.value === 'admin') {
+                isAdmin = true;
+                adminModal.classList.add('hidden');
+                userViewContainer.classList.add('hidden');
+                adminViewContainer.classList.remove('hidden');
+                renderTasks(); // Re-render tasks to show admin buttons
+                renderAnalytics();
+            } else {
+                alert('Incorrect password. Please try again.');
+            }
+        });
+
+        closeModalBtn.addEventListener('click', () => {
+            adminModal.classList.add('hidden');
+            adminPasswordInput.value = '';
+        });
+
+        // Toggle back to Task View from Admin panel
+        returnTasksBtn.addEventListener('click', () => {
+            isAdmin = false;
+            adminViewContainer.classList.add('hidden');
+            userViewContainer.classList.remove('hidden');
+            renderTasks(); // Re-render tasks to show user buttons
+        });
+
+        downloadBtn.addEventListener('click', downloadReport);
+        currentUserInput.addEventListener('input', renderTasks);
+        sortBySelect.addEventListener('change', renderTasks);
+
+        // Initial render on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            renderTasks();
+            renderAnalytics();
+        });
+    </script>
+</body>
+</html>
